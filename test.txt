@@ -1,1 +1,86 @@
-e
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#include <Servo.h>
+
+Servo myServo;
+int type =2;
+
+const char* ssid = "HangerDrive-WiFi";
+const char* password = "gf4ekjdtc554y";
+
+const char* client_address = "192.168.11.10";  //送り先
+const int client_port = 22220;  //送り先
+const int server_port = 22226;  //このESP32 のポート番号
+
+
+#define RECVDATANUM 9
+#define SENDDATANUM 9
+
+WiFiUDP udp;
+
+typedef union {
+  int32_t ival;
+  float fval;
+  byte binary[4];
+} uf;
+
+
+uf r_ufdata[RECVDATANUM];
+uf s_ufdata[SENDDATANUM];
+
+void setup() {
+  Serial.begin(9600);
+  myServo.attach(2);
+
+  Serial.println("[ESP32] Connecting to WiFi network: " + String(ssid));
+  WiFi.disconnect(true, true);
+  delay(500);
+  
+  WiFi.begin(ssid, password);
+  while( WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+
+
+  //UDP 開始
+  udp.begin(server_port);
+  Serial.println("Start");
+  delay(500);
+}
+
+void receiveUDP(){
+    int packetSize = udp.parsePacket();
+    byte tmpbuf[128];
+
+    //Unity のテストボタンで1バイトのデータが送られてきた時の処理    
+    if(packetSize == 1)
+    {
+      //Serial.println("recv");
+      udp.read(tmpbuf, sizeof(uf));
+      for (int a=0; a<sizeof(uf); a++) 
+      {
+        r_ufdata[0].binary[a] = tmpbuf[a];
+      }
+      
+      type = r_ufdata[0].ival;
+      Serial.println(type);
+    }
+}
+
+void loop() {
+  receiveUDP();
+  if(type != 2){
+    if(type == 0){
+      myServo.write(110);
+    }
+    else{
+      myServo.write(0);
+    }
+  }
+  
+  delay(15);
+}
